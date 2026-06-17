@@ -73,15 +73,7 @@ The script produces:
 
 ---
 
-## Key Findings
 
-- Calibration assessment is **method-dependent**
-- Cox-based calibration tends to **underestimate miscalibration**
-- PV-based calibration provides more **realistic error estimates**
-- HARE reveals **local instability and heterogeneity**
-- Adding biomarkers **does not improve calibration**, and may worsen it
-
----
 
 ## Requirements
 
