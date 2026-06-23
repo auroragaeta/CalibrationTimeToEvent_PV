@@ -7,7 +7,7 @@ in survival analysis.
 
 We compare three approaches to evaluate absolute risk calibration:
 
-- Cox-based (traditional)
+- Cox-based
 - Pseudo-values (PV-based)
 - HARE (flexible hazard regression)
 
