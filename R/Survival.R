@@ -33,14 +33,14 @@ test  <- rotterdam[-id_train, ]
 
 
 
-## BASE COX MODEL--------
+## BASE COX MODEL----------------
 mod_base <- coxph(
   Surv(dtime, death) ~ age + size  , data = train,
   x = TRUE, y = TRUE
 )
 mod_base %>% tbl_regression(exponentiate = TRUE)
 
-## BIOMARKER MODEL--------
+## BIOMARKER MODEL----------------
 mod_biom <- coxph(
   Surv(dtime, death) ~ age + size + nodes ,
   data = train,
@@ -149,66 +149,6 @@ make_calibration_cox = function(p_pred, data, t0, knots = 3, eps = 1e-6, dtime, 
   )
 }
 
-#MAKE CALIBRATION HARE  -----
-make_calibration_hare <- function(p_pred, data, t0  , dtime, death, maxdim = 5) {
-  # clamp numerico
-  # p_pred=p_base
-  # data=test
-  # t0=365.25*3
-  # maxdim = 5
-  eps = 1e-6
-  p_pred <- pmin(pmax(p_pred, eps), 1 - eps)
-  eta <- cloglog(p_pred)
-  
-  dcal <- data.frame(
-    dtime = dtime,
-    death   = death,
-    eta        = eta
-  )
-  cc <- complete.cases(dcal$dtime, dcal$death, dcal$eta)
-  dcc <- dcal[cc, , drop = FALSE]
-  cal_fit =polspline::hare(
-    data  = dcc$dtime,
-    delta = dcc$death,
-    cov   = matrix(dcc$eta, ncol = 1),
-    maxdim = maxdim)
-  
-  # Smoothed observed risk per soggetto: P(T <= t0 | eta_i)
-  obs_hat_i_cc <- as.numeric(
-    polspline::phare(
-      q   = t0,
-      cov = matrix(dcc$eta, ncol = 1),
-      fit = cal_fit
-    )
-    
-  )
-  
-  obs_hat_i_cc <- pmin(pmax(obs_hat_i_cc, 0), 1)
-  obs_hat_i <- rep(NA_real_, nrow(dcal))
-  obs_hat_i[cc] <- obs_hat_i_cc
-  grid_p   <- seq(0.001, 0.99, length.out = 200)
-  grid_eta <- cloglog(grid_p)
-  grid_obs <- as.numeric(
-    polspline::phare(
-      q   = t0,
-      cov = matrix(grid_eta, ncol = 1),
-      fit = cal_fit
-      
-    )
-    
-  )
-  grid_obs <- pmin(pmax(grid_obs, 0), 1)
-  list(
-    obs_hat_i_cc=obs_hat_i_cc,
-    cal_fit   = cal_fit,
-    obs_hat_i = obs_hat_i,
-    grid_p    = grid_p,
-    grid_obs  = grid_obs,
-    cc        = cc
-  )
-  
-}
-
 
 
 
@@ -223,8 +163,6 @@ cal_biomm <- make_calibration(prob_biom, test, t0,  dtime=test$dtime, death=test
 cal_base_cox <- make_calibration_cox(prob_base, test, t0,  dtime=test$dtime, death=test$death)
 cal_biomm_cox <- make_calibration_cox(prob_biom, test, t0,  dtime=test$dtime, death=test$death)
 
-cal_base_hare <- make_calibration_hare(prob_base, data = test, t0 = t0,  dtime=test$dtime, death=test$death)
-cal_bio_hare  <- make_calibration_hare(prob_biom,  data = test, t0 = t0,  dtime=test$dtime, death=test$death)
 
 
 # PLOTS
@@ -262,17 +200,6 @@ df_biom_pv = data.frame(
   method = "New (PV)")
 
 
-# Extract HARE-based curves
-df_base_HARE = data.frame(
-  pred = cal_base_hare$grid_p,
-  obs = cal_base_hare$grid_obs,
-  method = "New (PV)")
-
-df_biom_HARE = data.frame(
-  pred = cal_bio_hare$grid_p,
-  obs = cal_bio_hare$grid_obs,
-  method = "New (PV)")
-
 
 
 
@@ -292,104 +219,8 @@ prob_cox_biom=as.numeric(test$prob_cox_biom)
 # Create a small dataframe for the rug (individual patient predictions)
 df_rug_base = data.frame(pred = prob_cox_base)
 
-#------------
 
-#PLOT------
-## with hare -----
-plot_cal_with_hist_hare_added <- function(curve_cox,
-                               curve_pv,
-                               curve_hare,
-                               pred_cox, pred_pv, pred_hare,
-                               main_title,
-                               x_zoom = c(0,0.1),
-                               breaks = seq(0,0.1,length.out=30)) {
-  
-
-  # FILTER PREDICTIONS
-
-  v1 <- pred_cox[!is.na(pred_cox) & pred_cox >= x_zoom[1] & pred_cox <= x_zoom[2]]
-  v2 <- pred_pv [!is.na(pred_pv)  & pred_pv  >= x_zoom[1] & pred_pv  <= x_zoom[2]]
-  v3 <- pred_hare[!is.na(pred_hare) & pred_hare >= x_zoom[1] & pred_hare <= x_zoom[2]]
-  
-  h1 <- hist(v1, breaks = breaks, plot = FALSE)
-  h2 <- hist(v2, breaks = breaks, plot = FALSE)
-  h3 <- hist(v3, breaks = breaks, plot = FALSE)
-  
-  op <- par(no.readonly = TRUE)
-  layout(matrix(c(1,2), nrow = 2), heights = c(4,1))
-  
-
-  # PANEL 1: CALIBRATION
-
-  par(mar = c(4,4,3,1))
-  
-  plot(curve_cox$grid_p, curve_cox$grid_obs,
-       type="l", lwd=2, col="#4D4D4D",
-       xlim=x_zoom, ylim=x_zoom,
-       xlab="Predicted risk (3-year)",
-       ylab="Observed risk",
-       main=main_title)
-  
-  # PV
-  lines(curve_pv$grid_p, curve_pv$grid_obs,
-        lwd=2, col="#D95F02")
-  
-  # HARE
-  lines(curve_hare$grid_p, curve_hare$grid_obs,
-        lwd=2, col="#1B9E77")
-  
-  # ideal
-  abline(0,1,lty=3,col="#7570B3")
-  
-  legend("topleft",
-         legend=c("Cox-based","PV-based","HARE","Ideal"),
-         col=c("#4D4D4D","#D95F02","#1B9E77","#7570B3"),
-         lty=c(1,1,1,3),
-         lwd=c(2,2,2,1),
-         bty="n")
-  
-
-  # PANEL 2: HISTOGRAM
-
-  par(mar = c(4,4,1,1))
-  
-  ymax <- max(h1$density, h2$density, h3$density)
-  
-  plot(NA, NA, xlim = x_zoom, ylim = c(0, ymax),
-       xlab="Predicted risk", ylab="Density")
-  
-  for(i in seq_along(h1$density)){
-    
-    rect(h1$breaks[i],0,h1$breaks[i+1],h1$density[i],
-         col=adjustcolor("#4D4D4D", alpha.f=0.25), border=NA)
-    
-    rect(h2$breaks[i],0,h2$breaks[i+1],h2$density[i],
-         col=adjustcolor("#D95F02", alpha.f=0.20), border=NA)
-    
-    rect(h3$breaks[i],0,h3$breaks[i+1],h3$density[i],
-         col=adjustcolor("#1B9E77", alpha.f=0.20), border=NA)
-  }
-  
-  box()
-  par(op)
-}
-
-
-
-
-plot_cal_with_hist(
-  curve_cox = cal_base_cox,
-  curve_pv  = cal_base,
-  curve_hare = cal_base_hare,   # <-- devi averlo
-  pred_cox  = prob_base,
-  pred_pv   = prob_base,
-  pred_hare = prob_base,
-  main_title = "Calibration (Base Model)",
-  x_zoom = c(0,0.1)
-)
-
-
-## without hare-------
+## PLOT-------
 plot_cal_with_hist <- function(curve_cox, curve_pv,
                                pred_cox, pred_pv,
                                main_title,
