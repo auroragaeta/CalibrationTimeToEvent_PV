@@ -16,6 +16,7 @@ for(p in required_packages){
 make_calibration = function(p_pred, data, t0, knots = 3, eps = 1e-6, dtime, death) {
   p_pred = pmin(pmax(p_pred, eps), 1 - eps)
   eta = p_pred
+  eta = log(-log(1 - eta)) 
   
   dcal = data.frame(
     time = dtime,
@@ -42,7 +43,7 @@ make_calibration = function(p_pred, data, t0, knots = 3, eps = 1e-6, dtime, deat
   
   # Calibration curve on a common grid for the plot
   grid_p   = seq(0.001, 0.99, length.out = 200)
-  grid_eta = grid_p
+  grid_eta = log(-log(1 - grid_eta)) 
   grid_obs = as.numeric(predict(cal_fit, newdata = data.frame(eta = grid_eta),
                                 type = "response"))
   grid_obs = pmin(pmax(grid_obs, 0), 1)
