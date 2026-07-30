@@ -10,10 +10,7 @@ We compare two approaches to evaluate absolute risk calibration:
 - Flexible survival-model-based approaches
 - Pseudo-Value (PV) regression 
 
-R code to implement the calibration assessment:
-
-- <a href="code.R">Standard setting </a>
-- Competing risk setting
+<a href="code.R">R code </a> to implement the calibration assessment in both standard settings and under competing risks.
 
 The choice of calibration framework may influence the interpretation of model performance and the perceived added value of novel biomarkers.
 
