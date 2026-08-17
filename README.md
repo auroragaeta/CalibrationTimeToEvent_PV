@@ -3,6 +3,7 @@
 ## Authors
 
 Aurora Gaeta, Xinhui Ran, Andrea Bellavia
+
 TIMI Study Group, Brigham and Women's Hospital, Harvard Medical School
 
 ## Overview
